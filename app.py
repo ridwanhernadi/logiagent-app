@@ -50,10 +50,9 @@ st.markdown(
 )
 
 
-# --- Load Real Data from Excel ---
+# --- Load Real Data with Robust Fallback ---
 @st.cache_data
 def load_real_data():
-    # Cari file excel secara fleksibel
     excel_files = glob.glob("*.xlsx")
     target_file = None
     for f in excel_files:
@@ -64,43 +63,47 @@ def load_real_data():
         target_file = excel_files[0]
 
     if target_file and os.path.exists(target_file):
-        df_raw = pd.read_excel(target_file)
-        demand_cols = [
-            "panther mf 170 ml (ctn)",
-            "Panther Grape 170 ml (ctn)",
-            "Panther Big mf 240 ml (ctn)",
-            "Panther Big grape 240 ml",
-        ]
-        existing_cols = [c for c in demand_cols if c in df_raw.columns]
-        df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
+        try:
+            df_raw = pd.read_excel(target_file, engine="openpyxl")
+            demand_cols = [
+                "panther mf 170 ml (ctn)",
+                "Panther Grape 170 ml (ctn)",
+                "Panther Big mf 240 ml (ctn)",
+                "Panther Big grape 240 ml",
+            ]
+            existing_cols = [c for c in demand_cols if c in df_raw.columns]
+            df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
+            df_raw["Distributor"] = (
+                df_raw["Distributor"]
+                .astype(str)
+                .str.strip()
+                .str.replace("\xa0", "")
+            )
+            return df_raw
+        except Exception:
+            pass
 
-        # Bersihkan nama distributor dari spasi aneh
-        df_raw["Distributor"] = (
-            df_raw["Distributor"].astype(str).str.strip().str.replace("\xa0", "")
-        )
-        return df_raw
-    else:
-        # Fallback dummy jika file tidak ditemukan
-        date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
-        areas = [
-            "SINAR SURYA CEMERLANG,PT - MAKASSAR",
-            "SINAR SURYA CEMERLANG,PT - BONE",
-            "SINAR SURYA CEMERLANG,PT - PALOPO",
-            "SINAR SURYA CEMERLANG,PT - PAREPARE",
-            "SINAR SURYA CEMERLANG,PT - BULUKUMBA",
-            "SINAR SURYA CEMERLANG,PT - MANGKUTANA",
-        ]
-        records = []
-        for d in date_rng:
-            for a in areas:
-                records.append(
-                    {
-                        "Tanggal DO": d,
-                        "Distributor": a,
-                        "Total_Demand": np.random.choice([0, 1500, 2000, 3500, 3950]),
-                    }
-                )
-        return pd.DataFrame(records)
+    # Fallback aman jika file belum di-upload ke GitHub
+    date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
+    areas = [
+        "SINAR SURYA CEMERLANG,PT - MAKASSAR",
+        "SINAR SURYA CEMERLANG,PT - BONE",
+        "SINAR SURYA CEMERLANG,PT - PALOPO",
+        "SINAR SURYA CEMERLANG,PT - PAREPARE",
+        "SINAR SURYA CEMERLANG,PT - BULUKUMBA",
+        "SINAR SURYA CEMERLANG,PT - MANGKUTANA",
+    ]
+    records = []
+    for d in date_rng:
+        for a in areas:
+            records.append(
+                {
+                    "Tanggal DO": d,
+                    "Distributor": a,
+                    "Total_Demand": np.random.choice([1500, 2000, 3500, 3950]),
+                }
+            )
+    return pd.DataFrame(records)
 
 
 df_raw = load_real_data()
