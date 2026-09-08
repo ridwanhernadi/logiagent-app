@@ -1,4 +1,6 @@
 import datetime
+import glob
+import os
 import warnings
 import numpy as np
 import pandas as pd
@@ -48,12 +50,21 @@ st.markdown(
 )
 
 
-# --- Load Real Data with Fallback Protection ---
+# --- Load Real Data from Excel ---
 @st.cache_data
 def load_real_data():
-    file_path = "Relisasi outbond panther ktm makassar 3 bulan terakhir.xlsx"
-    try:
-        df_raw = pd.read_excel(file_path)
+    # Cari file excel secara fleksibel
+    excel_files = glob.glob("*.xlsx")
+    target_file = None
+    for f in excel_files:
+        if "relisasi" in f.lower() or "panther" in f.lower() or "makassar" in f.lower():
+            target_file = f
+            break
+    if not target_file and len(excel_files) > 0:
+        target_file = excel_files[0]
+
+    if target_file and os.path.exists(target_file):
+        df_raw = pd.read_excel(target_file)
         demand_cols = [
             "panther mf 170 ml (ctn)",
             "Panther Grape 170 ml (ctn)",
@@ -62,19 +73,34 @@ def load_real_data():
         ]
         existing_cols = [c for c in demand_cols if c in df_raw.columns]
         df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
-        df_raw["Distributor"] = df_raw["Distributor"].str.strip()
-        return df_raw
-    except Exception:
-        # Fallback dummy data jika file excel belum terbaca di cloud
-        date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
-        df_fallback = pd.DataFrame(
-            {
-                "Tanggal DO": date_rng,
-                "Distributor": "SINAR SURYA CEMERLANG,PT - MAKASSAR",
-                "Total_Demand": np.random.uniform(5000, 10000, len(date_rng)),
-            }
+
+        # Bersihkan nama distributor dari spasi aneh
+        df_raw["Distributor"] = (
+            df_raw["Distributor"].astype(str).str.strip().str.replace("\xa0", "")
         )
-        return df_fallback
+        return df_raw
+    else:
+        # Fallback dummy jika file tidak ditemukan
+        date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
+        areas = [
+            "SINAR SURYA CEMERLANG,PT - MAKASSAR",
+            "SINAR SURYA CEMERLANG,PT - BONE",
+            "SINAR SURYA CEMERLANG,PT - PALOPO",
+            "SINAR SURYA CEMERLANG,PT - PAREPARE",
+            "SINAR SURYA CEMERLANG,PT - BULUKUMBA",
+            "SINAR SURYA CEMERLANG,PT - MANGKUTANA",
+        ]
+        records = []
+        for d in date_rng:
+            for a in areas:
+                records.append(
+                    {
+                        "Tanggal DO": d,
+                        "Distributor": a,
+                        "Total_Demand": np.random.choice([0, 1500, 2000, 3500, 3950]),
+                    }
+                )
+        return pd.DataFrame(records)
 
 
 df_raw = load_real_data()
@@ -82,7 +108,9 @@ df_raw = load_real_data()
 # --- Sidebar Configuration ---
 st.sidebar.markdown("## ⚙️ Parameter Konfigurasi")
 
-distributor_list = sorted(df_raw["Distributor"].dropna().unique().tolist())
+distributor_list = sorted(
+    [d for d in df_raw["Distributor"].dropna().unique() if d != "nan"]
+)
 area_options = ["Total Semua Area"] + distributor_list
 
 selected_area = st.sidebar.selectbox(
@@ -173,9 +201,9 @@ forecast_series = pd.Series(forecast_full.values, index=forecast_index)
 safety_buffer_val = z_val * rmse
 
 if selected_target_date in forecast_series.index:
-    base_pred = forecast_series.loc[selected_target_date]
+    base_pred = max(0, forecast_series.loc[selected_target_date])
 else:
-    base_pred = forecast_series.iloc[0]
+    base_pred = max(0, forecast_series.iloc[0])
 
 target_demand = base_pred + safety_buffer_val
 
