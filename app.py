@@ -41,40 +41,42 @@ st.markdown(
     """
     <div style="background: linear-gradient(90deg, #161B22 0%, #21262D 100%); padding: 20px; border-radius: 10px; border-left: 5px solid #58A6FF; margin-bottom: 20px;">
         <h1 style="color: #58A6FF; margin:0; font-size: 28px;">LogiAgent: Autonomous Fleet Optimization Dashboard</h1>
-        <p style="color: #8B949E; margin:5px 0 0 0; font-size: 14px;">Decision Support System untuk Outbound Logistics (Senin - Sabtu | Libur Minggu)</p>
+        <p style="color: #8B949E; margin:5px 0 0 0; font-size: 14px;">Makassar Outbound Logistics DSS - Maklon KTM (Senin - Sabtu | Libur Minggu)</p>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
 
-# --- Data Generation Engine ---
+# --- Load Real Data from Excel ---
 @st.cache_data
-def load_historical_data():
-    np.random.seed(42)
-    date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
-    base_trend = np.linspace(7000, 9500, len(date_rng))
-    seasonality = 1500 * np.sin(np.linspace(0, 3 * np.pi, len(date_rng)))
-    noise = np.random.normal(0, 400, len(date_rng))
-    demand = base_trend + seasonality + noise
+def load_real_data():
+    file_path = "Relisasi outbond panther ktm makassar 3 bulan terakhir.xlsx"
+    df_raw = pd.read_excel(file_path)
 
-    df = pd.DataFrame({"Demand": np.clip(demand, 4000, 14000)}, index=date_rng)
-    return df
+    demand_cols = [
+        "panther mf 170 ml (ctn)",
+        "Panther Grape 170 ml (ctn)",
+        "Panther Big mf 240 ml (ctn)",
+        "Panther Big grape 240 ml",
+    ]
+    existing_cols = [c for c in demand_cols if c in df_raw.columns]
+    df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
+    df_raw["Distributor"] = df_raw["Distributor"].str.strip()
+
+    return df_raw
 
 
-df_history = load_historical_data()
+df_raw = load_real_data()
 
 # --- Sidebar Configuration ---
 st.sidebar.markdown("## ⚙️ Parameter Konfigurasi")
 
-area_pilihan = st.sidebar.selectbox(
-    "Pilih Area / Rute Pengiriman:",
-    [
-        "Total Semua Area",
-        "Rute Jakarta - Bandung",
-        "Rute Surabaya - Malang",
-        "Rute Medan - Pekanbaru",
-    ],
+distributor_list = sorted(df_raw["Distributor"].dropna().unique().tolist())
+area_options = ["Total Semua Area"] + distributor_list
+
+selected_area = st.sidebar.selectbox(
+    "Pilih Area / Rute Pengiriman:", options=area_options
 )
 
 z_score_map = {
@@ -124,23 +126,40 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-# --- Holt-Winters Forecasting Model ---
-model = ExponentialSmoothing(
-    df_history["Demand"],
-    trend="add",
-    seasonal="add",
-    seasonal_periods=5,
-    initialization_method="estimated",
-).fit()
+# --- Prepare Time Series Data based on Selected Area ---
+if selected_area == "Total Semua Area":
+    ts_data = df_raw.groupby("Tanggal DO")["Total_Demand"].sum()
+else:
+    filtered_df = df_raw[df_raw["Distributor"] == selected_area]
+    ts_data = filtered_df.groupby("Tanggal DO")["Total_Demand"].sum()
 
-forecast_full = model.forecast(steps=30)
+ts_data = ts_data.resample("B").sum().fillna(0)
+
+# --- Holt-Winters Forecasting Model ---
+try:
+    model = ExponentialSmoothing(
+        ts_data,
+        trend="add",
+        seasonal="add",
+        seasonal_periods=5,
+        initialization_method="estimated",
+    ).fit()
+    forecast_full = model.forecast(steps=30)
+    fitted_values = model.fittedvalues
+    rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
+except Exception:
+    model = ExponentialSmoothing(
+        ts_data, trend="add", initialization_method="estimated"
+    ).fit()
+    forecast_full = model.forecast(steps=30)
+    fitted_values = model.fittedvalues
+    rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
+
 forecast_index = pd.date_range(
-    start=df_history.index[-1] + pd.Timedelta(days=1), periods=30, freq="B"
+    start=ts_data.index[-1] + pd.Timedelta(days=1), periods=30, freq="B"
 )
 forecast_series = pd.Series(forecast_full.values, index=forecast_index)
 
-fitted_values = model.fittedvalues
-rmse = np.sqrt(np.mean((df_history["Demand"] - fitted_values) ** 2))
 safety_buffer_val = z_val * rmse
 
 if selected_target_date in forecast_series.index:
@@ -150,13 +169,27 @@ else:
 
 target_demand = base_pred + safety_buffer_val
 
-# --- Integer Linear Programming (ILP) Fleet Optimization via PuLP ---
-fleet_types = {
-    "CDD 7 Ton": {"cap": 1500, "cost": 1800000, "max_unit": 8},
-    "FUSO 10 Ton": {"cap": 2000, "cost": 2400000, "max_unit": 6},
-    "FUSO 17 Ton": {"cap": 3800, "cost": 4800000, "max_unit": 4},
-}
+# --- Dynamic Fleet Rules & Pricing based on Route/Area ---
+# Menyesuaikan tarif dan kapasitas spesifik sesuai rute
+if "PALOPO" in selected_area.upper():
+    fleet_types = {
+        "CDD 7 Ton": {"cap": 1600, "cost": 4500000, "max_unit": 10}
+    }
+elif "MANGKUTANA" in selected_area.upper():
+    fleet_types = {
+        "CDD 7 Ton": {"cap": 1600, "cost": 5300000, "max_unit": 10}
+    }
+else:
+    # Standar / Rute Makassar & Umum
+    fleet_types = {
+        "CDD 7 Ton": {"cap": 1600, "cost": 1500000, "max_unit": 10},
+        "Fuso 8 Ton": {"cap": 2000, "cost": 1700000, "max_unit": 8},
+        "FUSO 14 Ton": {"cap": 3500, "cost": 2100000, "max_unit": 6},
+        "FUSO 17 Ton": {"cap": 3950, "cost": 1950000, "max_unit": 6},
+        "Wing Box 18 Ton": {"cap": 4500, "cost": 2300000, "max_unit": 4},
+    }
 
+# --- Integer Linear Programming (ILP) Fleet Optimization via PuLP ---
 prob = pl.LpProblem("Fleet_Allocation_Optimization", pl.LpMinimize)
 
 x_vars = {
@@ -199,7 +232,7 @@ with col1:
         <div class="metric-card">
             <p style="color: #8B949E; margin:0; font-size:13px;">PREDIKSI DEMAND ({selected_target_date.strftime('%d %b')})</p>
             <h2 style="color: #58A6FF; margin:5px 0 0 0; font-size:24px;">{base_pred:,.0f} Ctn</h2>
-            <span style="color: #3fb950; font-size:11px;">+ Tren & Musiman Terkini</span>
+            <span style="color: #3fb950; font-size:11px;">+ Tren & Musiman</span>
         </div>
     """,
         unsafe_allow_html=True,
@@ -248,14 +281,16 @@ st.markdown("<br>", unsafe_allow_html=True)
 col_left, col_right = st.columns([1.3, 1])
 
 with col_left:
-    st.markdown("### 📈 Demand Trend & Forecast (Senin - Sabtu)")
+    st.markdown(
+        f"### 📈 Demand Trend & Forecast ({selected_area} - Senin - Sabtu)"
+    )
 
-    df_plot_hist = df_history.tail(45)
+    df_plot_hist = ts_data.tail(45)
     df_plot_fc = forecast_series.head(horizon_prediksi)
 
     chart_data = pd.DataFrame(
         {
-            "Histori Demand": df_plot_hist["Demand"],
+            "Histori Demand": df_plot_hist,
             "Holt-Winters Forecast": pd.Series(dtype=float),
         }
     )
@@ -268,7 +303,7 @@ with col_left:
         height=320,
     )
     st.caption(
-        "*Garis biru menunjukkan data historis harian, garis hijau menyoroti proyeksi peramalan ke depan sesuai horizon terpilih.*"
+        "*Garis biru menunjukkan data historis riil dari file Excel, garis hijau menyoroti proyeksi peramalan ke depan.*"
     )
 
 with col_right:
