@@ -164,7 +164,7 @@ st.sidebar.markdown(
     """
 <div style='background-color: #1f242d; padding: 10px; border-radius: 5px; font-size: 12px;'>
     <b>🤖 Agentic Workflow</b><br>
-    Ask → Analyze → Recommend → Feedback → Re-optimize → Decide
+    Ask → Analyze → Recommend → Decide
 </div>
 """,
     unsafe_allow_html=True,
@@ -500,81 +500,6 @@ if st.button("🚀 Kirim Notifikasi Approval & Eksekusi Booking"):
     st.success(
         "✅ Email eksekutif berhasil disimulasikan & dicatat di Audit Trail."
     )
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --- NEW: AGENTIC CHAT & CONSTRAINT FEEDBACK MODULE ---
-st.markdown("### 💬 LogiAgent Natural Language & Constraint Feedback")
-st.markdown(
-    "<p style='font-size: 13px; color: #8B949E;'>Siklus interaksi agentic: <b>Ask → Analyze → Recommend → Feedback → Re-optimize → Decide</b>. Masukkan kendala operasional dengan bahasa natural.</p>",
-    unsafe_allow_html=True,
-)
-
-if "chat_history" not in st.session_state:
-  st.session_state.chat_history = [{
-      "role": "agent",
-      "text": (
-          "Halo! Saya LogiAgent. Skenario alokasi untuk"
-          f" {selected_target_date.strftime('%d %b %Y')} telah siap. Ada"
-          " kendala armada atau penyesuaian constraint di lapangan?"
-      ),
-  }]
-
-for chat in st.session_state.chat_history:
-  if chat["role"] == "user":
-    st.markdown(
-        f"<div style='background-color: #161B22; padding: 10px;"
-        f" border-radius: 6px; margin: 5px 0; border-left: 3px solid #3FB950;'><b>👤"
-        f" Planner:</b> {chat['text']}</div>",
-        unsafe_allow_html=True,
-    )
-  else:
-    st.markdown(
-        f"<div style='background-color: #1f242d; padding: 10px;"
-        f" border-radius: 6px; margin: 5px 0; border-left: 3px solid #58A6FF;'><b>🤖"
-        f" LogiAgent:</b> {chat['text']}</div>",
-        unsafe_allow_html=True,
-    )
-
-user_feedback = st.text_input(
-    "Ketik instruksi atau kendala operasional untuk LogiAgent:",
-    placeholder=(
-        "Contoh: FUSO 17T hanya tersedia 1 unit / Prioritaskan biaya..."
-    ),
-)
-
-if st.button("Kirim Instruksi ke Agent"):
-  if user_feedback:
-    st.session_state.chat_history.append(
-        {"role": "user", "text": user_feedback}
-    )
-    feedback_lower = user_feedback.lower()
-
-    if (
-        "1" in feedback_lower
-        or "satu" in feedback_lower
-        or "hanya" in feedback_lower
-    ):
-      response_msg = (
-          "Menerima constraint: Kendala unit truk besar dicatat. Saya telah"
-          " melakukan *re-optimization* dengan mengalihkan ke armada"
-          " pendukung. Alternatif strategi telah disesuaikan."
-      )
-    elif "biaya" in feedback_lower or "cost" in feedback_lower:
-      response_msg = (
-          "Memahami preferensi: Menggeser prioritas ke arah minimisasi biaya."
-          " Opsi A (Cost-Efficient) kini diset sebagai rekomendasi utama."
-      )
-    else:
-      response_msg = (
-          f"Menerima masukan '{user_feedback}'. Parameter operasional"
-          " disesuaikan secara dinamis."
-      )
-
-    st.session_state.chat_history.append(
-        {"role": "agent", "text": response_msg}
-    )
-    st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
