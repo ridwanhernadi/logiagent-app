@@ -394,7 +394,7 @@ notif_channel = st.selectbox(
 
 # --- Fungsi Kirim Telegram Nyata (Diperbaiki) ---
 def send_telegram_notification(message):
-  token = "8964347914:AAEztGExXJor515lbfMtOkF3V1246dR2GI"
+  token = "8964347914:AAEztGExXXjOr515IbfMtOkF3V1246dR2GI"
   chat_id = "1336305534"
 
   url = f"https://api.telegram.org/bot{token}/sendMessage"
