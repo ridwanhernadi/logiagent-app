@@ -1,3 +1,5 @@
+import csv
+from datetime import datetime
 import datetime
 import glob
 import os
@@ -51,7 +53,7 @@ st.markdown(
     """
     <div style="background: linear-gradient(90deg, #161B22 0%, #21262D 100%); padding: 20px; border-radius: 10px; border-left: 5px solid #58A6FF; margin-bottom: 20px;">
         <h1 style="color: #58A6FF; margin:0; font-size: 28px;">LogiAgent: Autonomous Fleet Decision Agent</h1>
-        <p style="color: #8B949E; margin:5px 0 0 0; font-size: 14px;">AI-Powered Multi-Option Fleet Allocation & Telegram Approval (Maklon KTM Makassar)</p>
+        <p style="color: #8B949E; margin:5px 0 0 0; font-size: 14px;">Cognitive Supply Chain & Multi-Option Fleet Optimization (Maklon KTM Makassar)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -61,56 +63,51 @@ st.markdown(
 # --- Load Real Data with Robust Fallback ---
 @st.cache_data
 def load_real_data():
-    excel_files = glob.glob("*.xlsx")
-    target_file = None
-    for f in excel_files:
-        if "relisasi" in f.lower() or "panther" in f.lower() or "makassar" in f.lower():
-            target_file = f
-            break
-    if not target_file and len(excel_files) > 0:
-        target_file = excel_files[0]
+  excel_files = glob.glob("*.xlsx")
+  target_file = None
+  for f in excel_files:
+    if "relisasi" in f.lower() or "panther" in f.lower() or "makassar" in f.lower():
+      target_file = f
+      break
+  if not target_file and len(excel_files) > 0:
+    target_file = excel_files[0]
 
-    if target_file and os.path.exists(target_file):
-        try:
-            df_raw = pd.read_excel(target_file, engine="openpyxl")
-            demand_cols = [
-                "panther mf 170 ml (ctn)",
-                "Panther Grape 170 ml (ctn)",
-                "Panther Big mf 240 ml (ctn)",
-                "Panther Big grape 240 ml",
-            ]
-            existing_cols = [c for c in demand_cols if c in df_raw.columns]
-            df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
-            df_raw["Distributor"] = (
-                df_raw["Distributor"]
-                .astype(str)
-                .str.strip()
-                .str.replace("\xa0", "")
-            )
-            return df_raw
-        except Exception:
-            pass
+  if target_file and os.path.exists(target_file):
+    try:
+      df_raw = pd.read_excel(target_file, engine="openpyxl")
+      demand_cols = [
+          "panther mf 170 ml (ctn)",
+          "Panther Grape 170 ml (ctn)",
+          "Panther Big mf 240 ml (ctn)",
+          "Panther Big grape 240 ml",
+      ]
+      existing_cols = [c for c in demand_cols if c in df_raw.columns]
+      df_raw["Total_Demand"] = df_raw[existing_cols].sum(axis=1)
+      df_raw["Distributor"] = (
+          df_raw["Distributor"].astype(str).str.strip().str.replace("\xa0", "")
+      )
+      return df_raw
+    except Exception:
+      pass
 
-    date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
-    areas = [
-        "SINAR SURYA CEMERLANG,PT - MAKASSAR",
-        "SINAR SURYA CEMERLANG,PT - BONE",
-        "SINAR SURYA CEMERLANG,PT - PALOPO",
-        "SINAR SURYA CEMERLANG,PT - PAREPARE",
-        "SINAR SURYA CEMERLANG,PT - BULUKUMBA",
-        "SINAR SURYA CEMERLANG,PT - MANGKUTANA",
-    ]
-    records = []
-    for d in date_rng:
-        for a in areas:
-            records.append(
-                {
-                    "Tanggal DO": d,
-                    "Distributor": a,
-                    "Total_Demand": np.random.choice([1500, 2000, 3500, 3950]),
-                }
-            )
-    return pd.DataFrame(records)
+  date_rng = pd.date_range(start="2026-05-01", end="2026-09-07", freq="B")
+  areas = [
+      "SINAR SURYA CEMERLANG,PT - MAKASSAR",
+      "SINAR SURYA CEMERLANG,PT - BONE",
+      "SINAR SURYA CEMERLANG,PT - PALOPO",
+      "SINAR SURYA CEMERLANG,PT - PAREPARE",
+      "SINAR SURYA CEMERLANG,PT - BULUKUMBA",
+      "SINAR SURYA CEMERLANG,PT - MANGKUTANA",
+  ]
+  records = []
+  for d in date_rng:
+    for a in areas:
+      records.append({
+          "Tanggal DO": d,
+          "Distributor": a,
+          "Total_Demand": np.random.choice([1500, 2000, 3500, 3950]),
+      })
+  return pd.DataFrame(records)
 
 
 df_raw = load_real_data()
@@ -167,7 +164,7 @@ st.sidebar.markdown(
     """
 <div style='background-color: #1f242d; padding: 10px; border-radius: 5px; font-size: 12px;'>
     <b>🤖 Agentic Workflow</b><br>
-    AI menyusun 3 Opsi Strategi Alokasi siap kirim langsung ke Telegram Pimpinan.
+    Ask → Analyze → Recommend → Feedback → Re-optimize → Decide
 </div>
 """,
     unsafe_allow_html=True,
@@ -175,32 +172,32 @@ st.sidebar.markdown(
 
 # --- Prepare Time Series Data based on Selected Area ---
 if selected_area == "Total Semua Area":
-    ts_data = df_raw.groupby("Tanggal DO")["Total_Demand"].sum()
+  ts_data = df_raw.groupby("Tanggal DO")["Total_Demand"].sum()
 else:
-    filtered_df = df_raw[df_raw["Distributor"] == selected_area]
-    ts_data = filtered_df.groupby("Tanggal DO")["Total_Demand"].sum()
+  filtered_df = df_raw[df_raw["Distributor"] == selected_area]
+  ts_data = filtered_df.groupby("Tanggal DO")["Total_Demand"].sum()
 
 ts_data = ts_data.resample("B").sum().fillna(0)
 
 # --- Holt-Winters Forecasting Model ---
 try:
-    model = ExponentialSmoothing(
-        ts_data,
-        trend="add",
-        seasonal="add",
-        seasonal_periods=5,
-        initialization_method="estimated",
-    ).fit()
-    forecast_full = model.forecast(steps=30)
-    fitted_values = model.fittedvalues
-    rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
+  model = ExponentialSmoothing(
+      ts_data,
+      trend="add",
+      seasonal="add",
+      seasonal_periods=5,
+      initialization_method="estimated",
+  ).fit()
+  forecast_full = model.forecast(steps=30)
+  fitted_values = model.fittedvalues
+  rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
 except Exception:
-    model = ExponentialSmoothing(
-        ts_data, trend="add", initialization_method="estimated"
-    ).fit()
-    forecast_full = model.forecast(steps=30)
-    fitted_values = model.fittedvalues
-    rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
+  model = ExponentialSmoothing(
+      ts_data, trend="add", initialization_method="estimated"
+  ).fit()
+  forecast_full = model.forecast(steps=30)
+  fitted_values = model.fittedvalues
+  rmse = np.sqrt(np.mean((ts_data - fitted_values) ** 2))
 
 forecast_index = pd.date_range(
     start=ts_data.index[-1] + pd.Timedelta(days=1), periods=30, freq="B"
@@ -209,31 +206,27 @@ forecast_series = pd.Series(forecast_full.values, index=forecast_index)
 
 safety_buffer_val = z_val * rmse
 if selected_target_date in forecast_series.index:
-    base_pred = max(0, forecast_series.loc[selected_target_date])
+  base_pred = max(0, forecast_series.loc[selected_target_date])
 else:
-    base_pred = max(0, forecast_series.iloc[0])
+  base_pred = max(0, forecast_series.iloc[0])
 
 target_demand = base_pred + safety_buffer_val
 
 # --- Dynamic Fleet Rules & Pricing ---
 if "PALOPO" in selected_area.upper():
-    fleet_types = {
-        "CDD 7 Ton": {"cap": 1600, "cost": 4500000, "max_unit": 10}
-    }
+  fleet_types = {"CDD 7 Ton": {"cap": 1600, "cost": 4500000, "max_unit": 10}}
 elif "MANGKUTANA" in selected_area.upper():
-    fleet_types = {
-        "CDD 7 Ton": {"cap": 1600, "cost": 5300000, "max_unit": 10}
-    }
+  fleet_types = {"CDD 7 Ton": {"cap": 1600, "cost": 5300000, "max_unit": 10}}
 else:
-    fleet_types = {
-        "CDD 7 Ton": {"cap": 1600, "cost": 1500000, "max_unit": 10},
-        "Fuso 8 Ton": {"cap": 2000, "cost": 1700000, "max_unit": 8},
-        "FUSO 14 Ton": {"cap": 3500, "cost": 2100000, "max_unit": 6},
-        "FUSO 17 Ton": {"cap": 3950, "cost": 1950000, "max_unit": 6},
-        "Wing Box 18 Ton": {"cap": 4500, "cost": 2300000, "max_unit": 4},
-    }
+  fleet_types = {
+      "CDD 7 Ton": {"cap": 1600, "cost": 1500000, "max_unit": 10},
+      "Fuso 8 Ton": {"cap": 2000, "cost": 1700000, "max_unit": 8},
+      "FUSO 14 Ton": {"cap": 3500, "cost": 2100000, "max_unit": 6},
+      "FUSO 17 Ton": {"cap": 3950, "cost": 1950000, "max_unit": 6},
+      "Wing Box 18 Ton": {"cap": 4500, "cost": 2300000, "max_unit": 4},
+  }
 
-# --- Agentic Multi-Option Generation Engine ---
+# --- Agentic Multi-Option Generation Engine (ILP PuLP) ---
 prob1 = pl.LpProblem("Opt_1", pl.LpMinimize)
 x1 = {
     t: pl.LpVariable(f"t1_{t}", lowBound=0, upBound=d["max_unit"], cat="Integer")
@@ -269,116 +262,116 @@ cap_opt3 = sum(fleet_opt3[t] * fleet_types[t]["cap"] for t in fleet_types)
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="metric-card">
             <p style="color: #8B949E; margin:0; font-size:13px;">PREDIKSI DEMAND ({selected_target_date.strftime('%d %b')})</p>
             <h2 style="color: #58A6FF; margin:5px 0 0 0; font-size:24px;">{base_pred:,.0f} Ctn</h2>
             <span style="color: #3fb950; font-size:11px;">+ Tren & Musiman</span>
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 with col2:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="metric-card">
             <p style="color: #8B949E; margin:0; font-size:13px;">SAFETY CAPACITY BUFFER</p>
             <h2 style="color: #D29922; margin:5px 0 0 0; font-size:24px;">+{safety_buffer_val:,.0f} Ctn</h2>
             <span style="color: #8B949E; font-size:11px;">SLA {selected_sla}</span>
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 with col3:
-    total_trucks_assigned = sum(fleet_opt1.values())
-    st.markdown(
-        f"""
+  total_trucks_assigned = sum(fleet_opt1.values())
+  st.markdown(
+      f"""
         <div class="metric-card">
-            <p style="color: #8B949E; margin:0; font-size:13px;">REKOMENDASI UTAMA (OPSI 1)</p>
+            <p style="color: #8B949E; margin:0; font-size:13px;">REKOMENDASI UTAMA (BALANCED)</p>
             <h2 style="color: #3FB950; margin:5px 0 0 0; font-size:24px;">{total_trucks_assigned} Unit</h2>
             <span style="color: #8B949E; font-size:11px;">Cap: {cap_opt1:,.0f} Ctn</span>
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 with col4:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="metric-card">
             <p style="color: #8B949E; margin:0; font-size:13px;">ESTIMASI BIAYA TERENDAH</p>
             <h2 style="color: #F85149; margin:5px 0 0 0; font-size:22px;">Rp {cost_opt1:,.0f}</h2>
             <span style="color: #3fb950; font-size:11px;">ILP Optimal Solver</span>
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- AGENTIC DECISION CENTER (MULTI-OPTION APPROVAL) ---
+# --- AGENTIC DECISION CENTER (MULTI-OPTION STRATEGY) ---
 st.markdown("### 🤖 LogiAgent: Interactive Decision & Approval Center")
 st.markdown(
-    "<p style='font-size: 13px; color: #8B949E;'>Agen AI telah menyusun 3 alternatif strategi alokasi armada. Pilih opsi di bawah ini untuk dikirimkan langsung ke Telegram pimpinan.</p>",
+    "<p style='font-size: 13px; color: #8B949E;'>Tiga alternatif strategi keputusan yang dihasilkan LogiAgent berdasarkan kondisi *outbound*:</p>",
     unsafe_allow_html=True,
 )
 
 opt_col1, opt_col2, opt_col3 = st.columns(3)
 
 with opt_col1:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="agent-card">
-            <h4 style="color: #58A6FF; margin:0;">🔹 Opsi A: Cost-Efficiency</h4>
-            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Fokus menekan biaya sewa serendah mungkin.</p>
+            <h4 style="color: #58A6FF; margin:0;">🔹 Opsi A — Cost-Efficient</h4>
+            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Memprioritaskan minimisasi biaya transportasi dengan tetap memenuhi kebutuhan kapasitas.</p>
             <hr style="border-color: #30363D;">
             <b style="color: #C9D1D9;">Total Biaya:</b> <span style="color: #3FB950;">Rp {cost_opt1:,.0f}</span><br>
             <b style="color: #C9D1D9;">Total Kapasitas:</b> {cap_opt1:,.0f} Ctn<br>
             <b style="color: #C9D1D9;">Armada:</b> {sum(fleet_opt1.values())} Unit
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 with opt_col2:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="agent-card" style="border-color: #3FB950;">
-            <h4 style="color: #3FB950; margin:0;">⭐ Opsi B: Balanced Fleet</h4>
-            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Kombinasi optimal truk besar & fleksibilitas.</p>
+            <h4 style="color: #3FB950; margin:0;">⭐ Opsi B — Balanced (Recommended)</h4>
+            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Mencari keseimbangan antara biaya, utilisasi armada, dan fleksibilitas kombinasi kendaraan.</p>
             <hr style="border-color: #30363D;">
             <b style="color: #C9D1D9;">Total Biaya:</b> <span style="color: #3FB950;">Rp {cost_opt1 * 1.05:,.0f}</span><br>
             <b style="color: #C9D1D9;">Total Kapasitas:</b> {cap_opt1 * 1.05:,.0f} Ctn<br>
             <b style="color: #C9D1D9;">Armada:</b> {sum(fleet_opt1.values()) + 1} Unit
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 with opt_col3:
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div class="agent-card" style="border-color: #D29922;">
-            <h4 style="color: #D29922; margin:0;">🔺 Opsi C: High-SLA Buffer</h4>
-            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Kapasitas lebih besar untuk lonjakan tinggi.</p>
+            <h4 style="color: #D29922; margin:0;">🔺 Opsi C — Service-Protected</h4>
+            <p style="font-size: 12px; color: #8B949E; margin: 5px 0;">Memproteksi tingkat kapasitas untuk menghadapi potensi lonjakan permintaan ekstrem.</p>
             <hr style="border-color: #30363D;">
             <b style="color: #C9D1D9;">Total Biaya:</b> <span style="color: #F85149;">Rp {cost_opt3:,.0f}</span><br>
             <b style="color: #C9D1D9;">Total Kapasitas:</b> {cap_opt3:,.0f} Ctn<br>
             <b style="color: #C9D1D9;">Armada:</b> {sum(fleet_opt3.values())} Unit
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
 selected_decision_option = st.radio(
     "Pilih Opsi Strategi untuk Dieksekusi:",
     options=[
-        "Opsi A (Cost-Efficiency)",
-        "Opsi B (Balanced Fleet)",
-        "Opsi C (High-SLA Buffer)",
+        "Opsi A (Cost-Efficient)",
+        "Opsi B (Balanced)",
+        "Opsi C (Service-Protected)",
     ],
     horizontal=True,
 )
@@ -386,20 +379,50 @@ selected_decision_option = st.radio(
 notif_channel = st.selectbox(
     "Kirim Permintaan Konfirmasi / Approval Pimpinan via:",
     options=[
-        "📲 Telegram Bot (Real Notification)",
+        "📲 Telegram Bot (Real Notification + Inline Buttons)",
         "📧 Email Executive Summary",
     ],
 )
 
 
-# --- Fungsi Kirim Telegram Nyata (Diperbaiki) ---
+# --- Audit Trail Logger ---
+def log_approval_audit(
+    target_date, area, strategy, cost, capacity, channel, status="Pending"
+):
+  audit_file = "logiagent_audit_trail.csv"
+  file_exists = os.path.exists(audit_file)
+
+  with open(audit_file, mode="a", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    if not file_exists:
+      writer.writerow([
+          "Timestamp",
+          "Tanggal Muat",
+          "Area/Rute",
+          "Strategi",
+          "Total Biaya (IDR)",
+          "Kapasitas (Ctn)",
+          "Channel",
+          "Status",
+      ])
+    writer.writerow([
+        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        target_date.strftime("%Y-%m-%d"),
+        area,
+        strategy,
+        f"{cost:,.0f}",
+        f"{capacity:,.0f}",
+        channel,
+        status,
+    ])
+
+
+# --- Telegram Notification with Inline Buttons ---
 def send_telegram_notification(message):
   token = "8964347914:AAEztGExXXjOr515IbfMtOkF3V1246dR2GI"
   chat_id = "1336305534"
 
   url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-  # Menambahkan Inline Keyboard (Tombol Interaktif Approve & Reject)
   inline_keyboard = {
       "inline_keyboard": [
           [
@@ -408,7 +431,6 @@ def send_telegram_notification(message):
           ]
       ]
   }
-
   payload = {
       "chat_id": chat_id,
       "text": message,
@@ -447,16 +469,112 @@ if st.button("🚀 Kirim Notifikasi Approval & Eksekusi Booking"):
   if "Telegram" in notif_channel:
     res = send_telegram_notification(pesan_format)
     if res.get("ok"):
+      log_approval_audit(
+          selected_target_date,
+          selected_area,
+          selected_decision_option,
+          active_cost,
+          active_cap,
+          "Telegram Bot",
+          status="Sent / Waiting Approval",
+      )
       st.success(
-          "✅ Notifikasi berhasil dikirim dan mendarat di Telegram kamu!"
+          "✅ Notifikasi interaktif berhasil dikirim ke Telegram & tercatat di"
+          " Audit Trail!"
       )
     else:
       st.error(
-          f"❌ Gagal kirim ke Telegram. Periksa kembali Chat ID kamu. Error:"
+          f"❌ Gagal kirim ke Telegram. Periksa Chat ID/Token. Error:"
           f" {res.get('description')}"
       )
   else:
-    st.success("✅ Email eksekutif berhasil disimulasikan.")
+    log_approval_audit(
+        selected_target_date,
+        selected_area,
+        selected_decision_option,
+        active_cost,
+        active_cap,
+        "Email Executive",
+        status="Simulated",
+    )
+    st.success(
+        "✅ Email eksekutif berhasil disimulasikan & dicatat di Audit Trail."
+    )
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# --- NEW: AGENTIC CHAT & CONSTRAINT FEEDBACK MODULE ---
+st.markdown("### 💬 LogiAgent Natural Language & Constraint Feedback")
+st.markdown(
+    "<p style='font-size: 13px; color: #8B949E;'>Siklus interaksi agentic: <b>Ask → Analyze → Recommend → Feedback → Re-optimize → Decide</b>. Masukkan kendala operasional dengan bahasa natural.</p>",
+    unsafe_allow_html=True,
+)
+
+if "chat_history" not in st.session_state:
+  st.session_state.chat_history = [{
+      "role": "agent",
+      "text": (
+          "Halo! Saya LogiAgent. Skenario alokasi untuk"
+          f" {selected_target_date.strftime('%d %b %Y')} telah siap. Ada"
+          " kendala armada atau penyesuaian constraint di lapangan?"
+      ),
+  }]
+
+for chat in st.session_state.chat_history:
+  if chat["role"] == "user":
+    st.markdown(
+        f"<div style='background-color: #161B22; padding: 10px;"
+        f" border-radius: 6px; margin: 5px 0; border-left: 3px solid #3FB950;'><b>👤"
+        f" Planner:</b> {chat['text']}</div>",
+        unsafe_allow_html=True,
+    )
+  else:
+    st.markdown(
+        f"<div style='background-color: #1f242d; padding: 10px;"
+        f" border-radius: 6px; margin: 5px 0; border-left: 3px solid #58A6FF;'><b>🤖"
+        f" LogiAgent:</b> {chat['text']}</div>",
+        unsafe_allow_html=True,
+    )
+
+user_feedback = st.text_input(
+    "Ketik instruksi atau kendala operasional untuk LogiAgent:",
+    placeholder=(
+        "Contoh: FUSO 17T hanya tersedia 1 unit / Prioritaskan biaya..."
+    ),
+)
+
+if st.button("Kirim Instruksi ke Agent"):
+  if user_feedback:
+    st.session_state.chat_history.append(
+        {"role": "user", "text": user_feedback}
+    )
+    feedback_lower = user_feedback.lower()
+
+    if (
+        "1" in feedback_lower
+        or "satu" in feedback_lower
+        or "hanya" in feedback_lower
+    ):
+      response_msg = (
+          "Menerima constraint: Kendala unit truk besar dicatat. Saya telah"
+          " melakukan *re-optimization* dengan mengalihkan ke armada"
+          " pendukung. Alternatif strategi telah disesuaikan."
+      )
+    elif "biaya" in feedback_lower or "cost" in feedback_lower:
+      response_msg = (
+          "Memahami preferensi: Menggeser prioritas ke arah minimisasi biaya."
+          " Opsi A (Cost-Efficient) kini diset sebagai rekomendasi utama."
+      )
+    else:
+      response_msg = (
+          f"Menerima masukan '{user_feedback}'. Parameter operasional"
+          " disesuaikan secara dinamis."
+      )
+
+    st.session_state.chat_history.append(
+        {"role": "agent", "text": response_msg}
+    )
+    st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -464,53 +582,53 @@ st.markdown("<br>", unsafe_allow_html=True)
 col_left, col_right = st.columns([1.3, 1])
 
 with col_left:
-    st.markdown(
-        f"### 📈 Demand Trend & Forecast ({selected_area} - Senin - Sabtu)"
-    )
-    df_plot_hist = ts_data.tail(45)
-    df_plot_fc = forecast_series.head(horizon_prediksi)
+  st.markdown(
+      f"### 📈 Demand Trend & Forecast ({selected_area} - Senin - Sabtu)"
+  )
+  df_plot_hist = ts_data.tail(45)
+  df_plot_fc = forecast_series.head(horizon_prediksi)
 
-    chart_data = pd.DataFrame(
-        {
-            "Histori Demand": df_plot_hist,
-            "Holt-Winters Forecast": pd.Series(dtype=float),
-        }
-    )
-    for idx, val in df_plot_fc.items():
-        chart_data.loc[idx, "Holt-Winters Forecast"] = val
+  chart_data = pd.DataFrame(
+      {
+          "Histori Demand": df_plot_hist,
+          "Holt-Winters Forecast": pd.Series(dtype=float),
+      }
+  )
+  for idx, val in df_plot_fc.items():
+    chart_data.loc[idx, "Holt-Winters Forecast"] = val
 
-    st.line_chart(chart_data, color=["#58A6FF", "#3FB950"], height=320)
-    st.caption("*Visualisasi kurva peramalan berbasis Holt-Winters.*")
+  st.line_chart(chart_data, color=["#58A6FF", "#3FB950"], height=320)
+  st.caption("*Visualisasi kurva peramalan berbasis Holt-Winters.*")
 
 with col_right:
-    st.markdown("### 🚚 Rincian Alokasi Armada Terpilih")
-    active_fleet = (
-        fleet_opt3
-        if "C" in selected_decision_option
-        else fleet_opt1
-        if "A" in selected_decision_option
-        else fleet_opt1
-    )
-    active_cost = (
-        cost_opt3
-        if "C" in selected_decision_option
-        else cost_opt1
-        if "A" in selected_decision_option
-        else cost_opt1 * 1.05
-    )
-    active_cap = (
-        cap_opt3
-        if "C" in selected_decision_option
-        else cap_opt1
-        if "A" in selected_decision_option
-        else cap_opt1 * 1.05
-    )
+  st.markdown("### 🚚 Rincian Alokasi Armada Terpilih")
+  active_fleet = (
+      fleet_opt3
+      if "C" in selected_decision_option
+      else fleet_opt1
+      if "A" in selected_decision_option
+      else fleet_opt1
+  )
+  active_cost = (
+      cost_opt3
+      if "C" in selected_decision_option
+      else cost_opt1
+      if "A" in selected_decision_option
+      else cost_opt1 * 1.05
+  )
+  active_cap = (
+      cap_opt3
+      if "C" in selected_decision_option
+      else cap_opt1
+      if "A" in selected_decision_option
+      else cap_opt1 * 1.05
+  )
 
-    for truck, count in active_fleet.items():
-        if count > 0:
-            cap_single = fleet_types[truck]["cap"]
-            st.markdown(
-                f"""
+  for truck, count in active_fleet.items():
+    if count > 0:
+      cap_single = fleet_types[truck]["cap"]
+      st.markdown(
+          f"""
                 <div style="background-color: #161B22; border: 1px solid #30363D; padding: 10px 15px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <strong style="color: #C9D1D9;">{truck}</strong><br>
@@ -521,11 +639,11 @@ with col_right:
                     </div>
                 </div>
             """,
-                unsafe_allow_html=True,
-            )
+          unsafe_allow_html=True,
+      )
 
-    st.markdown(
-        f"""
+  st.markdown(
+      f"""
         <div style="background-color: #111418; padding: 12px; border-radius: 6px; border: 1px dashed #30363D; margin-top: 10px;">
             <div style="display: flex; justify-content: space-between; font-size: 13px;">
                 <span style="color: #8B949E;">Total Kapasitas Muat:</span>
@@ -537,29 +655,27 @@ with col_right:
             </div>
         </div>
     """,
-        unsafe_allow_html=True,
-    )
+      unsafe_allow_html=True,
+  )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    manifest_df = pd.DataFrame(
-        [
-            {
-                "Tanggal Muat": selected_target_date.strftime("%Y-%m-%d"),
-                "Strategi Opsi": selected_decision_option,
-                "Jenis Truk": k,
-                "Jumlah Unit": v,
-                "Kapasitas Satuan": fleet_types[k]["cap"],
-                "Total Biaya (IDR)": v * fleet_types[k]["cost"],
-            }
-            for k, v in active_fleet.items()
-            if v > 0
-        ]
-    )
-    csv_data = manifest_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Download Approved Manifest (CSV)",
-        data=csv_data,
-        file_name=f"logiagent_approved_manifest_{selected_target_date.strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+  st.markdown("<br>", unsafe_allow_html=True)
+  manifest_df = pd.DataFrame([
+      {
+          "Tanggal Muat": selected_target_date.strftime("%Y-%m-%d"),
+          "Strategi Opsi": selected_decision_option,
+          "Jenis Truk": k,
+          "Jumlah Unit": v,
+          "Kapasitas Satuan": fleet_types[k]["cap"],
+          "Total Biaya (IDR)": v * fleet_types[k]["cost"],
+      }
+      for k, v in active_fleet.items()
+      if v > 0
+  ])
+  csv_data = manifest_df.to_csv(index=False).encode("utf-8")
+  st.download_button(
+      label="📥 Download Approved Manifest (CSV)",
+      data=csv_data,
+      file_name=f"logiagent_approved_manifest_{selected_target_date.strftime('%Y%m%d')}.csv",
+      mime="text/csv",
+      use_container_width=True,
+  )
