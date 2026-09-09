@@ -396,7 +396,7 @@ notif_channel = st.selectbox(
 def send_telegram_notification(message):
   # Masukkan token bot dan chat ID yang sudah kamu dapatkan di sini
   token = "8964347914:AAEztGExXJor515lbfMtOkF3V1246dR2GI"
-  chat_id = "MASUKKAN_CHAT_ID_KAMU_DISINI"  # Ganti dengan angka Chat ID kamu
+  chat_id = "1336305534"  # Ganti dengan angka Chat ID kamu
 
   url = f"https://api.telegram.org/bot{token}/sendMessage"
   payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
