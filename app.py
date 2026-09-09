@@ -398,7 +398,24 @@ def send_telegram_notification(message):
   chat_id = "1336305534"
 
   url = f"https://api.telegram.org/bot{token}/sendMessage"
-  payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+
+  # Menambahkan Inline Keyboard (Tombol Interaktif Approve & Reject)
+  inline_keyboard = {
+      "inline_keyboard": [
+          [
+              {"text": "✅ Approve & Book", "callback_data": "app_approved"},
+              {"text": "❌ Reject", "callback_data": "app_rejected"},
+          ]
+      ]
+  }
+
+  payload = {
+      "chat_id": chat_id,
+      "text": message,
+      "parse_mode": "Markdown",
+      "reply_markup": inline_keyboard,
+  }
+
   try:
     response = requests.post(url, json=payload)
     return response.json()
