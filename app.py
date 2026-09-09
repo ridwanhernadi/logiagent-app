@@ -399,7 +399,7 @@ def send_telegram_notification(message):
   chat_id = "1336305534"  # Ganti dengan angka Chat ID kamu
 
   url = f"https://api.telegram.org/bot{token}/sendMessage"
-  payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+  payload = payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
   try:
     response = requests.post(url, json=payload)
     return response.json()
